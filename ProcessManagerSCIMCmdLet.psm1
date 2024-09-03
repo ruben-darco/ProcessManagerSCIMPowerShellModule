@@ -82,8 +82,10 @@ function Get-ProcessManagerUser {
     [string] $URL = $g_url,
     [Parameter(Mandatory=$False)]
     [string] $APIKEY = $g_apikey,
-    [Parameter(Mandatory=$True)]
-    [int] $ID
+    [Parameter(Mandatory=$False)]
+    [int] $ID,
+    [Parameter(Mandatory=$False)]
+    [string] $Logon
   )
   
   process {
@@ -91,12 +93,24 @@ function Get-ProcessManagerUser {
       Write-Error "APIKEY must be provided"
       return
     }
+    if ($ID -ne 0) {
+      $tmpurl = "${URL}/api/scim/users/${ID}"
+      $user = Invoke-RestMethod -Headers @{"Authorization" = "Bearer ${APIKEY}"} -Method GET  -Uri $tmpurl
+      $obj = SCIMUser2UserObject -response $user
+      return $obj
+    } elseif ([string]::IsNullOrEmpty($Logon) -eq $False) {
+      $tmpurl = "${URL}/api/scim/users?filter=userName eq ""${Logon}"""
+      $response = Invoke-RestMethod -Headers @{"Authorization" = "Bearer ${APIKEY}"} -Method GET  -Uri $tmpurl
+      if ($response.totalResults -eq 0) {
+        Write-Error "Could not find user with that Logon"
+        return
+      }
+      $obj = SCIMUser2UserObject -response $response.Resources[0]
+      return $obj
 
-    $tmpurl = "${URL}/api/scim/users/${ID}"
-
-    $user = Invoke-RestMethod -Headers @{"Authorization" = "Bearer ${APIKEY}"} -Method GET  -Uri $tmpurl
-    $obj = SCIMUser2UserObject -response $user
-    return $obj
+    } else {
+      Write-Error "Need to provide at least ID or Logon"
+    }
   }
 }   
 
